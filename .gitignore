@@ -1,0 +1,5 @@
+.DS_Store
+docs/.DS_Store
+formulas_output.json
+memory/
+.claude/

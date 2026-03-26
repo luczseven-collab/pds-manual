@@ -1,0 +1,384 @@
+/**
+ * Code.gs — メインエントリ
+ *
+ * ボタン押下で startProcessing() を実行。
+ * 10枚ずつ処理し、未処理が残っていれば即トリガーを登録して連続処理する。
+ */
+
+/**
+ * C列に注文コードが手動入力されたときにE・F・G列を生成する
+ * ※ onEditはシンプルトリガー（外部API不可）なので installableトリガー経由で呼ぶ
+ */
+function onEditTrigger(e) {
+  const sheet = e.range.getSheet();
+  const col = e.range.getColumn();
+  const row = e.range.getRow();
+
+  // 2行目以降のみ対象
+  if (row < 2) return;
+
+  // 集計シート名パターン（例：【PDS_2026-03-17】集計）のみ対象
+  if (!sheet.getName().match(/【.+_\d{4}-\d{2}-\d{2}】集計/)) return;
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  // C列（3列目）: 進捗が「完了」になったら行全体に色をつける
+  if (col === 3) {
+    const value = sheet.getRange(row, 3).getValue();
+    const totalCols = sheet.getLastColumn();
+    if (value === '完了') {
+      sheet.getRange(row, 1, 1, totalCols).setBackground('#D9EAD3'); // 緑
+    } else {
+      sheet.getRange(row, 1, 1, totalCols).setBackground(null); // 色をリセット
+    }
+    return;
+  }
+
+  // F列（6列目）: 注文コード入力時にG・H・I・J列を生成
+  if (col !== 6) return;
+
+  // 数式をセットしてから評価・H・I・J列を生成
+  SheetsUtils._setRowFormulas(sheet, row);
+  SpreadsheetApp.flush();
+  const orderCode = sheet.getRange(row, 6).getValue();
+  SheetsUtils._setRowTitle(sheet, row, ss, orderCode);
+
+  // Y〜AE列からanswersを復元してI列を再生成
+  // Y=25:年齢, Z=26:普段サイズ(空), AA=27:トップス, AB=28:ボトムス, AC=29:身長, AD=30:マタニティ, AE=31:骨格
+  const vals = sheet.getRange(row, 25, 1, 7).getValues()[0];
+  // AL〜AP列から品質・着心地・サイズ感・ドレス丈を取得（AL=38, AM=39, AN=40, AO=41, AP=42）
+  const qVals = sheet.getRange(row, 38, 1, 5).getValues()[0];
+  const answers = {
+    age:        vals[0],
+    topSize:    vals[2],
+    bottomSize: vals[3],
+    height:     vals[4],
+    maternity:  vals[5],
+    bodyType:   vals[6],
+    q3Quality:  qVals[0],
+    q3Comfort:  qVals[1],
+    q3Size:     qVals[3],
+    q3Length:   qVals[4],
+  };
+  SheetsUtils._setRowSizeHtml(ss, sheet, row, answers);
+  SheetsUtils._setRowDressHtml(ss, sheet, row);
+}
+
+/**
+ * スプレッドシートを開いたときに onEditTrigger が未登録なら自動登録する
+ * 月スプシをコピーした初回オープン時に自動でトリガーが設定される
+ */
+function onOpen() {
+  SpreadsheetApp.getUi()
+    .createMenu('PDS管理')
+    .addItem('月初セットアップ（初回のみ）', 'setupOnEditTrigger')
+    .addToUi();
+
+  // セットアップ済みフラグを確認（承認不要）
+  const isSetup = PropertiesService.getDocumentProperties().getProperty('TRIGGER_SETUP_DONE');
+  if (!isSetup) {
+    SpreadsheetApp.getUi().alert(
+      '月初セットアップが必要です\n\nPDS管理メニューから実行してください。'
+    );
+  }
+}
+
+/**
+ * installableトリガーを登録する（初回のみ手動実行）
+ */
+function setupOnEditTrigger() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  // 既存トリガーを削除してから再登録
+  ScriptApp.getProjectTriggers()
+    .filter(t => t.getHandlerFunction() === 'onEditTrigger')
+    .forEach(t => ScriptApp.deleteTrigger(t));
+  ScriptApp.newTrigger('onEditTrigger')
+    .forSpreadsheet(ss)
+    .onEdit()
+    .create();
+  // セットアップ済みフラグを保存
+  PropertiesService.getDocumentProperties().setProperty('TRIGGER_SETUP_DONE', 'true');
+  SpreadsheetApp.getUi().alert('セットアップ完了！\n注文コード入力が自動で動作するようになりました。');
+}
+
+/**
+ * ボタンから呼び出すエントリポイント。
+ * 既存の連続処理トリガーをリセットしてから checkNewFiles() を実行する。
+ */
+function startProcessing() {
+  // マスタのCSV貼付シートにデータがあるか確認
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const csvSheet = ss.getSheetByName('CSV貼付');
+  if (!csvSheet || csvSheet.getLastRow() < 2) {
+    SpreadsheetApp.getUi().alert('CSV貼付シートにデータがありません。\nCSVを貼り付けてから処理を開始してください。');
+    return;
+  }
+
+  _deleteContinueTriggers();
+  checkNewFiles();
+}
+
+/**
+ * 未処理ファイルを最大10枚処理する。
+ * 処理後に未処理が残っていれば即トリガーを登録して連続処理する。
+ * 全件完了したら完了通知を送る。
+ */
+function checkNewFiles() {
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(0)) {
+    Logger.log('別の処理が実行中のためスキップします');
+    return;
+  }
+
+  try {
+    _checkNewFilesCore();
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function _checkNewFilesCore() {
+  const BATCH_SIZE = 2;
+  const processedNames = SheetsUtils.getProcessedFileNames();
+  const allowed = ['application/pdf', 'image/jpeg', 'image/png'];
+
+  const targets = [
+    { folderId: Config.DRIVE_FOLDER_OK_ID, isPublishOk: true  },
+    { folderId: Config.DRIVE_FOLDER_NG_ID, isPublishOk: false },
+  ];
+
+  // 未処理ファイルを全件収集してファイル名昇順にソート
+  const pending = [];
+  targets.forEach(({ folderId, isPublishOk }) => {
+    if (!folderId) return;
+    const folder = DriveApp.getFolderById(folderId);
+    const files = folder.getFiles();
+    while (files.hasNext()) {
+      const file = files.next();
+      if (processedNames.includes(file.getName())) continue;
+      if (!allowed.includes(file.getMimeType())) continue;
+      pending.push({ file, isPublishOk });
+    }
+  });
+  pending.sort((a, b) => a.file.getName().localeCompare(b.file.getName()));
+
+  if (pending.length === 0) {
+    NotifyUtils.notifyComplete(0);
+    return;
+  }
+
+  // 最大10枚を処理
+  const batch = pending.slice(0, BATCH_SIZE);
+  let count = 0;
+  batch.forEach(({ file, isPublishOk }) => {
+    try {
+      processAnketFile(file, isPublishOk);
+      count++;
+    } catch (e) {
+      Logger.log('ERROR: ' + file.getName() + ' — ' + e.message);
+      Logger.log('スタック: ' + e.stack);
+      SheetsUtils.writeLog(file.getName(), 'ERROR', e.message);
+    }
+  });
+
+  // 未処理が残っていれば即トリガーを登録して続きを処理
+  const remaining = pending.length - batch.length;
+  Logger.log('処理枚数: ' + batch.length + ' / 残り: ' + remaining + ' / pending合計: ' + pending.length);
+  if (remaining > 0) {
+    Logger.log('続きのトリガーを登録します');
+    _deleteContinueTriggers();
+    _scheduleContinueTrigger();
+  } else {
+    Logger.log('全件完了 → 完了通知');
+    NotifyUtils.notifyComplete(count);
+  }
+}
+
+
+/**
+ * checkNewFiles を1分後に実行するトリガーを登録する。
+ * GASの最短トリガー間隔は1分のため、これが最速の連続実行手段。
+ */
+function _scheduleContinueTrigger() {
+  ScriptApp.newTrigger('checkNewFiles')
+    .timeBased()
+    .after(60 * 1000)
+    .create();
+}
+
+/**
+ * 連続処理用トリガー（checkNewFiles）を全削除する。
+ */
+function _deleteContinueTriggers() {
+  ScriptApp.getProjectTriggers()
+    .filter(t => t.getHandlerFunction() === 'checkNewFiles')
+    .forEach(t => ScriptApp.deleteTrigger(t));
+}
+
+function processAnketFile(file, isPublishOk) {
+  SheetsUtils.writeLog(file.getName(), 'PROCESSING', '');
+
+  const imageData = OcrUtils.getImageData(file);
+  const answers = AiUtils.readAnswersFromImage(imageData);
+  answers.fileName = file.getName();
+  answers.isPublishOk = isPublishOk;
+
+  // 感情分析
+  const analyzed = AiUtils.analyzeSentiment(answers);
+  analyzed.isPublishOk = isPublishOk;
+
+  // freeCommentがある場合のみ返信文を生成
+  if (analyzed.freeComment) {
+    analyzed.aiReply = AiUtils.generateReply(analyzed);
+  } else {
+    analyzed.aiReply = '';
+  }
+
+  // 集計シートに書き込む（HTML・返信文生成後）
+  SheetsUtils.writeToSummarySheet(analyzed);
+
+  // 意見まとめシートに書き込む
+  SheetsUtils.writeToOpinionSheet(analyzed);
+
+  SheetsUtils.writeLog(file.getName(), 'DONE', '');
+}
+
+/**
+ * 全シートを一括作成する（初回セットアップ時に実行）
+ * 既存シートはスキップ、既存内容は変更しない
+ */
+function initSheets() {
+  const ss = SpreadsheetApp.openById(Config.SPREADSHEET_ID);
+
+  const summaryHeaders = [
+    '処理日時', 'ファイル名', '注文コード', '年齢', '普段の洋服のサイズ', 'トップスサイズ', 'ボトムスサイズ',
+    '身長(cm)', 'マタニティ', '骨格タイプ', '利用エリア', '都道府県', 'エリア',
+    'どこで知りましたか？', '今回のご利用用途', 'ご利用商品はいかがでしたか？',
+    '品質', '着心地', '※あまり良くないと答えた方',
+    'サイズ感', 'ドレス丈/パンツ丈', 'レンタルの流れはいかがでしたか？',
+    '※不便と答えた人用', '着用頂いた感想・サイズ感・レンタルの流れについてのご意見'
+  ];
+
+  const opinionHeaders = [
+    '処理日時', '自由意見', '品質・着心地NG理由', 'レンタルNG理由',
+    '感情', 'AI返信文', 'HTMLスニペット'
+  ];
+
+  const logHeaders = ['処理日時', 'ファイル名', 'ステータス', 'エラー内容'];
+
+  const toneHeaders = ['項目', '設定値'];
+  const toneData = [
+    ['ブランド名・署名', 'PARTY DRESS STYLE'],
+    ['回答の口調・文体', '丁寧でフレンドリー'],
+    ['共感フレーズ（固定）', 'この度はご利用いただきありがとうございます！'],
+    ['禁止語・NGワード', ''],
+    ['回答文字数目安', '100〜150文字'],
+    ['ネガティブ時の追記', '大変申し訳ございませんでした。改善に努めてまいります。']
+  ];
+
+  const sheets = [
+    { name: '【PDS】累計集計',  headers: summaryHeaders, color: '#D9E8FC' },
+    { name: '【OTONA】累計集計', headers: summaryHeaders, color: '#FCE4D6' },
+    { name: '【PDS】意見まとめ',  headers: opinionHeaders, color: '#D9E8FC' },
+    { name: '【OTONA】意見まとめ', headers: opinionHeaders, color: '#FCE4D6' },
+    { name: '【ログ】処理履歴',  headers: logHeaders,    color: '#F2F2F2' },
+    { name: '【設定】トンマナ',  headers: toneHeaders,   color: '#FFF2CC', data: toneData },
+  ];
+
+  sheets.forEach(({ name, headers, color, data }) => {
+    let sheet = ss.getSheetByName(name);
+    if (!sheet) {
+      sheet = ss.insertSheet(name);
+      sheet.appendRow(headers);
+      sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold').setBackground(color);
+      if (data) {
+        data.forEach(row => sheet.appendRow(row));
+      }
+      Logger.log('作成: ' + name);
+    } else {
+      Logger.log('スキップ（既存）: ' + name);
+    }
+  });
+
+  Logger.log('initSheets 完了');
+}
+
+function testSetRowTitle() {
+  const monthlySs = SpreadsheetApp.openById('1O9f0Ka805NSYfnpOmxkJfy1nRYfJzkBlj3o8gCTPeOU');
+  const sheet = monthlySs.getSheets().find(s => s.getName().match(/【.+_\d{4}-\d{2}-\d{2}】集計/));
+  if (!sheet) { Logger.log('日別シートが見つかりません'); return; }
+  const orderCode = sheet.getRange(2, 5).getValue();
+  Logger.log('対象シート: ' + sheet.getName() + ' 注文コード: ' + orderCode);
+  SheetsUtils._setRowTitle(sheet, 2, monthlySs, orderCode);
+}
+
+function testCreateMonthlySpreadsheet() {
+  const ss = SheetsUtils._getOrCreateMonthlySpreadsheet('PDS', '2026-03');
+  Logger.log('月スプシID: ' + ss.getId());
+  Logger.log('シート一覧: ' + ss.getSheets().map(s => s.getName()).join(', '));
+}
+
+function testCreateMonthlyDebug() {
+  Logger.log('DRIVE_FOLDER_MONTHLY_ID: ' + Config.DRIVE_FOLDER_MONTHLY_ID);
+  Logger.log('DRIVE_FOLDER_OK_ID: ' + Config.DRIVE_FOLDER_OK_ID);
+  Logger.log('SPREADSHEET_ID: ' + Config.SPREADSHEET_ID);
+
+  // OK フォルダにアクセスできるか確認
+  try {
+    const okFolder = DriveApp.getFolderById(Config.DRIVE_FOLDER_OK_ID);
+    Logger.log('OKフォルダ名: ' + okFolder.getName());
+  } catch(e) {
+    Logger.log('OKフォルダエラー: ' + e.message);
+  }
+
+  // Monthly フォルダにアクセスできるか確認
+  try {
+    const monthlyFolder = DriveApp.getFolderById(Config.DRIVE_FOLDER_MONTHLY_ID);
+    Logger.log('Monthlyフォルダ名: ' + monthlyFolder.getName());
+  } catch(e) {
+    Logger.log('Monthlyフォルダエラー: ' + e.message);
+  }
+
+  // マスタファイルにアクセスできるか確認
+  try {
+    const masterFile = DriveApp.getFileById(Config.SPREADSHEET_ID);
+    Logger.log('マスタファイル名: ' + masterFile.getName());
+  } catch(e) {
+    Logger.log('マスタファイルエラー: ' + e.message);
+  }
+}
+
+/**
+ * Apps Script APIのトリガー登録をテストする（単体デバッグ用）
+ * 実行してログを確認し、エラー内容を把握する
+ */
+function testRegisterTrigger() {
+  const spreadsheetId = SpreadsheetApp.getActiveSpreadsheet().getId();
+  Logger.log('対象SpreadsheetId: ' + spreadsheetId);
+  SheetsUtils._registerTriggerViaApi(spreadsheetId);
+  Logger.log('完了');
+}
+
+/**
+ * マスタスプシのセットアップ済みフラグを立てる（マスタでのポップアップを抑制）
+ */
+function markMasterAsSetup() {
+  PropertiesService.getDocumentProperties().setProperty('TRIGGER_SETUP_DONE', 'true');
+  Logger.log('マスタセットアップ済みフラグ設定完了');
+}
+
+function testOcr() {
+  const folder = DriveApp.getFolderById(Config.DRIVE_FOLDER_ID);
+  const files = folder.getFiles();
+  while (files.hasNext()) {
+    const file = files.next();
+    const mime = file.getMimeType();
+    if (mime !== 'image/jpeg' && mime !== 'image/png' && mime !== 'application/pdf') continue;
+    Logger.log('テスト対象: ' + file.getName());
+    const imageData = OcrUtils.getImageData(file);
+    const answers = AiUtils.readAnswersFromImage(imageData);
+    Logger.log('読み取り結果: ' + JSON.stringify(answers));
+    Logger.log('HTMLスニペット: ' + AiUtils.generateHtml(answers));
+    break;
+  }
+}

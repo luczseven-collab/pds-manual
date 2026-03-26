@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AIアンケート自動化システム 費用レポート | PARTY DRESS STYLE</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    /* ===== BASE ===== */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --pink:       #E91E8C;
+      --pink-light: #FF6B9D;
+      --pink-pale:  #FFF0F7;
+      --pink-mid:   #FCE4F3;
+      --gray-100:   #F8F9FA;
+      --gray-200:   #F0F2F5;
+      --gray-300:   #E2E6ED;
+      --gray-500:   #8D97A5;
+      --gray-700:   #4A5568;
+      --gray-900:   #1A202C;
+      --text:       #2D3748;
+      --white:      #FFFFFF;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--white);
+      color: var(--text);
+      font-family: 'Noto Sans JP', sans-serif;
+      font-size: 16px;
+      line-height: 1.75;
+    }
+
+    .container {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    /* ===== HEADER ===== */
+    header {
+      background: linear-gradient(135deg, var(--pink) 0%, var(--pink-light) 100%);
+      color: var(--white);
+      padding: 48px 0 40px;
+    }
+
+    .header-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 28px;
+    }
+
+    .header-brand {
+      font-size: 13px;
+      font-weight: 500;
+      background: rgba(255,255,255,0.25);
+      border-radius: 100px;
+      padding: 4px 14px;
+      letter-spacing: 0.04em;
+    }
+
+    .header-date {
+      font-size: 13px;
+      opacity: 0.85;
+    }
+
+    header h1 {
+      font-size: clamp(22px, 4vw, 32px);
+      font-weight: 900;
+      line-height: 1.3;
+      letter-spacing: -0.01em;
+    }
+
+    header h1 span {
+      display: block;
+      font-size: clamp(14px, 2vw, 17px);
+      font-weight: 400;
+      opacity: 0.85;
+      margin-top: 8px;
+      letter-spacing: 0;
+    }
+
+    /* ===== SECTION ===== */
+    section {
+      padding: 56px 0;
+    }
+
+    section + section {
+      border-top: 1px solid var(--gray-300);
+    }
+
+    .section-label {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--pink);
+      margin-bottom: 10px;
+    }
+
+    .section-title {
+      font-size: clamp(20px, 3vw, 26px);
+      font-weight: 900;
+      color: var(--gray-900);
+      line-height: 1.3;
+      margin-bottom: 32px;
+    }
+
+    /* ===== CONCLUSION CARD ===== */
+    .conclusion-card {
+      background: var(--pink-pale);
+      border: 2px solid var(--pink-light);
+      border-radius: 20px;
+      padding: 40px 36px;
+      text-align: center;
+    }
+
+    .conclusion-lead {
+      font-size: 17px;
+      color: var(--gray-700);
+      margin-bottom: 16px;
+    }
+
+    .conclusion-amount {
+      font-size: clamp(56px, 12vw, 88px);
+      font-weight: 900;
+      color: var(--pink);
+      line-height: 1;
+      letter-spacing: -0.04em;
+    }
+
+    .conclusion-unit {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--pink);
+      margin-top: 4px;
+    }
+
+    .conclusion-sub {
+      font-size: 14px;
+      color: var(--gray-500);
+      margin-top: 16px;
+    }
+
+    /* ===== FEATURES ===== */
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+    }
+
+    .feature-card {
+      background: var(--gray-100);
+      border-radius: 16px;
+      padding: 28px 24px;
+      text-align: center;
+    }
+
+    .feature-icon {
+      font-size: 36px;
+      margin-bottom: 14px;
+      display: block;
+    }
+
+    .feature-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--gray-900);
+      margin-bottom: 6px;
+    }
+
+    .feature-desc {
+      font-size: 13px;
+      color: var(--gray-500);
+      line-height: 1.6;
+    }
+
+    /* ===== CHART ===== */
+    .chart-card {
+      background: var(--gray-100);
+      border-radius: 20px;
+      padding: 32px;
+    }
+
+    .chart-note {
+      font-size: 13px;
+      color: var(--gray-500);
+      margin-top: 16px;
+      text-align: center;
+    }
+
+    .chart-canvas-wrap {
+      position: relative;
+      height: 300px;
+      margin-top: 8px;
+    }
+
+    /* ===== BEFORE / AFTER ===== */
+    .compare-wrap {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      gap: 0;
+      align-items: center;
+    }
+
+    .compare-box {
+      border-radius: 18px;
+      padding: 32px 28px;
+    }
+
+    .compare-box.before {
+      background: var(--gray-200);
+      border: 1.5px solid var(--gray-300);
+    }
+
+    .compare-box.after {
+      background: var(--pink-pale);
+      border: 2px solid var(--pink-light);
+    }
+
+    .compare-tag {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 3px 10px;
+      border-radius: 100px;
+      margin-bottom: 16px;
+    }
+
+    .compare-box.before .compare-tag {
+      background: var(--gray-300);
+      color: var(--gray-700);
+    }
+
+    .compare-box.after .compare-tag {
+      background: var(--pink);
+      color: var(--white);
+    }
+
+    .compare-box h3 {
+      font-size: 17px;
+      font-weight: 700;
+      margin-bottom: 20px;
+      color: var(--gray-900);
+    }
+
+    .compare-row {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      margin-bottom: 18px;
+    }
+
+    .compare-row:last-child { margin-bottom: 0; }
+
+    .compare-row .c-label {
+      font-size: 12px;
+      color: var(--gray-500);
+      font-weight: 500;
+    }
+
+    .compare-row .c-value {
+      font-size: 26px;
+      font-weight: 900;
+      line-height: 1.1;
+    }
+
+    .compare-box.before .c-value { color: var(--gray-700); }
+    .compare-box.after  .c-value { color: var(--pink); }
+
+    .compare-row .c-sub {
+      font-size: 12px;
+      color: var(--gray-500);
+    }
+
+    .compare-arrow {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 16px;
+    }
+
+    .arrow-circle {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--pink) 0%, var(--pink-light) 100%);
+      color: var(--white);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      flex-shrink: 0;
+      font-weight: 900;
+    }
+
+    /* ===== FOOTER ===== */
+    footer {
+      background: var(--gray-100);
+      border-top: 1px solid var(--gray-300);
+      padding: 36px 0;
+      text-align: center;
+    }
+
+    .footer-note {
+      font-size: 12px;
+      color: var(--gray-500);
+      line-height: 1.8;
+      max-width: 680px;
+      margin: 0 auto;
+    }
+
+    .footer-brand {
+      font-size: 12px;
+      color: var(--gray-500);
+      margin-top: 14px;
+      opacity: 0.7;
+    }
+
+    /* ===== PRINT ===== */
+    @media print {
+      header {
+        background: var(--pink) !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+
+      .conclusion-card,
+      .feature-card,
+      .chart-card,
+      .compare-box.after {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+
+      section { padding: 36px 0; }
+
+      .chart-canvas-wrap { height: 240px; }
+    }
+
+    /* ===== RESPONSIVE ===== */
+    @media (max-width: 640px) {
+      .compare-wrap {
+        grid-template-columns: 1fr;
+      }
+      .compare-arrow {
+        padding: 12px 0;
+      }
+      .arrow-circle {
+        transform: rotate(90deg);
+      }
+      .conclusion-card {
+        padding: 32px 20px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ===== HEADER ===== -->
+<header>
+  <div class="container">
+    <div class="header-top">
+      <span class="header-brand">PARTY DRESS STYLE</span>
+      <span class="header-date">2026年3月</span>
+    </div>
+    <h1>
+      AIアンケート自動化システム<br>費用レポート
+      <span>経営者向けサマリー / Claude（Anthropic社）利用</span>
+    </h1>
+  </div>
+</header>
+
+
+<!-- ===== CONCLUSION ===== -->
+<section>
+  <div class="container">
+    <div class="section-label">結論</div>
+    <h2 class="section-title">まず、費用をひと言で</h2>
+
+    <div class="conclusion-card">
+      <p class="conclusion-lead">月300枚のアンケートを処理した場合の月額費用は</p>
+      <div class="conclusion-amount">約3,400円</div>
+      <div class="conclusion-unit">/ 月</div>
+      <p class="conclusion-sub">※ お客様コメント（自由意見）が50%程度ある場合の試算</p>
+    </div>
+
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:24px;">
+      <div style="background:#fff; border:2px solid var(--pink-light); border-radius:16px; padding:24px; text-align:center;">
+        <div style="font-size:13px; color:var(--gray-500); margin-bottom:8px;">コメントあり（1枚あたり）</div>
+        <div style="font-size:48px; font-weight:900; color:var(--pink); line-height:1;">約13円</div>
+        <div style="font-size:13px; color:var(--gray-500); margin-top:8px;">画像読み取り＋感情分析＋返信文生成</div>
+      </div>
+      <div style="background:#fff; border:2px solid var(--gray-300); border-radius:16px; padding:24px; text-align:center;">
+        <div style="font-size:13px; color:var(--gray-500); margin-bottom:8px;">コメントなし（1枚あたり）</div>
+        <div style="font-size:48px; font-weight:900; color:var(--gray-700); line-height:1;">約9円</div>
+        <div style="font-size:13px; color:var(--gray-500); margin-top:8px;">画像読み取りのみ</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ===== FEATURES ===== -->
+<section>
+  <div class="container">
+    <div class="section-label">このシステムでできること</div>
+    <h2 class="section-title">3つの自動化</h2>
+
+    <div class="features-grid">
+      <div class="feature-card">
+        <span class="feature-icon">01</span>
+        <div class="feature-title">アンケートを自動で読み取る</div>
+        <div class="feature-desc">1枚あたり約10秒で完了。手書きも対応。</div>
+      </div>
+      <div class="feature-card">
+        <span class="feature-icon">02</span>
+        <div class="feature-title">お礼メッセージを自動生成</div>
+        <div class="feature-desc">お客様のコメントに合わせた文章を作成。</div>
+      </div>
+      <div class="feature-card">
+        <span class="feature-icon">03</span>
+        <div class="feature-title">スプレッドシートに自動集計</div>
+        <div class="feature-desc">Googleスプレッドシートへ即座に記録。</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ===== CHART ===== -->
+<section>
+  <div class="container">
+    <div class="section-label">費用のイメージ</div>
+    <h2 class="section-title">月に何枚処理するか？で変わります</h2>
+
+    <div class="chart-card">
+      <div class="chart-canvas-wrap">
+        <canvas id="costChart"></canvas>
+      </div>
+      <p class="chart-note">
+        ピンクの濃いバー（月300枚）が想定運用です。費用は枚数に比例して増えます。
+      </p>
+    </div>
+  </div>
+</section>
+
+
+<!-- ===== BEFORE / AFTER ===== -->
+<section>
+  <div class="container">
+    <div class="section-label">手作業との比較</div>
+    <h2 class="section-title">導入前と後、何が変わるか</h2>
+
+    <div class="compare-wrap">
+      <!-- Before -->
+      <div class="compare-box before">
+        <span class="compare-tag">導入前（手作業）</span>
+        <h3>今まで</h3>
+
+        <div class="compare-row">
+          <span class="c-label">1枚あたりの時間</span>
+          <span class="c-value">約5分</span>
+          <span class="c-sub">目視確認・入力・文章作成</span>
+        </div>
+        <div class="compare-row">
+          <span class="c-label">月300枚の合計</span>
+          <span class="c-value">約25時間</span>
+          <span class="c-sub">担当者の稼働時間を圧迫</span>
+        </div>
+        <div class="compare-row">
+          <span class="c-label">月のコスト</span>
+          <span class="c-value">人件費</span>
+          <span class="c-sub">時給 × 25時間分</span>
+        </div>
+      </div>
+
+      <!-- Arrow -->
+      <div class="compare-arrow">
+        <div class="arrow-circle">→</div>
+      </div>
+
+      <!-- After -->
+      <div class="compare-box after">
+        <span class="compare-tag">導入後（自動化）</span>
+        <h3>これから</h3>
+
+        <div class="compare-row">
+          <span class="c-label">1枚あたりの時間</span>
+          <span class="c-value">約10秒</span>
+          <span class="c-sub">全工程を自動で処理</span>
+        </div>
+        <div class="compare-row">
+          <span class="c-label">月300枚の合計</span>
+          <span class="c-value">ほぼ0時間</span>
+          <span class="c-sub">担当者は確認するだけ</span>
+        </div>
+        <div class="compare-row">
+          <span class="c-label">月のコスト</span>
+          <span class="c-value">約3,400円</span>
+          <span class="c-sub">予算管理しやすい固定費</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ===== FOOTER ===== -->
+<footer>
+  <div class="container">
+    <p class="footer-note">
+      費用はアンケート枚数や記入量により変動します（2026年3月実測値）。<br>
+      自由意見（お客様コメント）の量が多いほど費用が増加します。為替レートの変動により実際の費用が異なる場合があります。
+    </p>
+    <p class="footer-brand">PARTY DRESS STYLE — AIアンケート自動化システム 費用レポート 2026.03</p>
+  </div>
+</footer>
+
+
+<!-- ===== CHART.JS ===== -->
+<script>
+  const ctx = document.getElementById('costChart').getContext('2d');
+
+  const labels = ['月100枚', '月300枚\n（想定）', '月500枚', '月1,000枚'];
+
+  // 最小〜最大の中間値（自由意見50%基準）
+  const midValues  = [1100, 3400, 5625, 11250];
+  const minValues  = [900,  2700, 4500, 9000];
+  const maxValues  = [1300, 4050, 6750, 13500];
+
+  // 月300枚だけ強調色
+  const bgColors = [
+    'rgba(255,107,157,0.45)',
+    'rgba(233,30,140,0.92)',
+    'rgba(255,107,157,0.45)',
+    'rgba(255,107,157,0.45)',
+  ];
+  const borderColors = [
+    '#FF6B9D',
+    '#E91E8C',
+    '#FF6B9D',
+    '#FF6B9D',
+  ];
+
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: ['月100枚', '月300枚（想定）', '月500枚', '月1,000枚'],
+      datasets: [
+        {
+          label: '月額費用（目安）',
+          data: midValues,
+          backgroundColor: bgColors,
+          borderColor: borderColors,
+          borderWidth: 2,
+          borderRadius: 10,
+          borderSkipped: false,
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: {
+        duration: 800,
+        easing: 'easeOutQuart',
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#fff',
+          borderColor: '#E91E8C',
+          borderWidth: 1,
+          titleColor: '#2D3748',
+          bodyColor: '#4A5568',
+          padding: 14,
+          cornerRadius: 10,
+          callbacks: {
+            title: (items) => items[0].label,
+            label: (context) => {
+              const idx = context.dataIndex;
+              const min = minValues[idx].toLocaleString();
+              const max = maxValues[idx].toLocaleString();
+              return `  月額費用の目安：¥${min} 〜 ¥${max}`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: { display: false },
+          ticks: {
+            color: '#4A5568',
+            font: { family: "'Noto Sans JP', sans-serif", size: 13, weight: '500' }
+          }
+        },
+        y: {
+          grid: { color: 'rgba(0,0,0,0.06)' },
+          ticks: {
+            color: '#8D97A5',
+            font: { family: "'Noto Sans JP', sans-serif", size: 12 },
+            callback: (val) => '¥' + val.toLocaleString()
+          },
+          beginAtZero: true,
+          suggestedMax: 14000,
+        }
+      }
+    }
+  });
+</script>
+
+</body>
+</html>
