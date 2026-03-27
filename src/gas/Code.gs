@@ -43,11 +43,16 @@ function onEditTrigger(e) {
   const orderCode = sheet.getRange(row, 6).getValue();
   SheetsUtils._setRowTitle(sheet, row, ss, orderCode);
 
-  // Y〜AE列からanswersを復元してI列を再生成
+  // G列: カテゴリ（AH=都道府県, AI=エリア, AK=今回のご利用用途）を空でないものをスペース区切りで結合
+  const catVals = sheet.getRange(row, 34, 1, 4).getValues()[0]; // AH=34, AI=35, AJ=36, AK=37
+  const category = [catVals[0], catVals[1], catVals[3]].filter(v => v).join(' '); // AH, AI, AK
+  sheet.getRange(row, 7).setValue(category);
+
+  // Z〜AF列からanswersを復元してI列を再生成
   // Y=25:年齢, Z=26:普段サイズ(空), AA=27:トップス, AB=28:ボトムス, AC=29:身長, AD=30:マタニティ, AE=31:骨格
-  const vals = sheet.getRange(row, 25, 1, 7).getValues()[0];
-  // AL〜AP列から品質・着心地・サイズ感・ドレス丈を取得（AL=38, AM=39, AN=40, AO=41, AP=42）
-  const qVals = sheet.getRange(row, 38, 1, 5).getValues()[0];
+  const vals = sheet.getRange(row, 26, 1, 7).getValues()[0];
+  // AM〜AQ列から品質・着心地・サイズ感・ドレス丈を取得（AM=39, AN=40, AO=41, AP=42, AQ=43）
+  const qVals = sheet.getRange(row, 39, 1, 5).getValues()[0];
   const answers = {
     age:        vals[0],
     topSize:    vals[2],
@@ -62,6 +67,10 @@ function onEditTrigger(e) {
   };
   SheetsUtils._setRowSizeHtml(ss, sheet, row, answers);
   SheetsUtils._setRowDressHtml(ss, sheet, row);
+
+  // 注文コード入力時に商品画像を保存
+  const fileName = sheet.getRange(row, 5).getValue(); // E列: ファイル名
+  ImageUtils.saveImages({ orderCode, fileName, sheet, row });
 }
 
 /**
@@ -96,9 +105,34 @@ function setupOnEditTrigger() {
     .forSpreadsheet(ss)
     .onEdit()
     .create();
+
+  // マスタのスクリプトプロパティをこのスクリプトにコピー
+  _copyPropertiesFromMaster();
+
   // セットアップ済みフラグを保存
   PropertiesService.getDocumentProperties().setProperty('TRIGGER_SETUP_DONE', 'true');
   SpreadsheetApp.getUi().alert('セットアップ完了！\n注文コード入力が自動で動作するようになりました。');
+}
+
+/**
+ * マスタスプシの【設定】シートからフォルダIDを読み取り、
+ * このスクリプトのプロパティに自動登録する。
+ */
+function _copyPropertiesFromMaster() {
+  const MASTER_SS_ID = '1SRx_la6Tl_Y-Lrm5tF10yzPyQfEmiwzcZgydsG4_iKM';
+  const masterSs = SpreadsheetApp.openById(MASTER_SS_ID);
+  const sheet = masterSs.getSheetByName('設定');
+  if (!sheet || sheet.getLastRow() < 1) {
+    Logger.log('_copyPropertiesFromMaster: 【設定】シートが見つかりません');
+    return;
+  }
+
+  const data = sheet.getRange(1, 1, sheet.getLastRow(), 2).getValues();
+  const localProps = PropertiesService.getScriptProperties();
+  data.forEach(([key, value]) => {
+    if (key && value) localProps.setProperty(String(key), String(value));
+  });
+  Logger.log('_copyPropertiesFromMaster: プロパティコピー完了（' + data.length + '件）');
 }
 
 /**
@@ -138,7 +172,7 @@ function checkNewFiles() {
 }
 
 function _checkNewFilesCore() {
-  const BATCH_SIZE = 2;
+  const BATCH_SIZE = 7;
   const processedNames = SheetsUtils.getProcessedFileNames();
   const allowed = ['application/pdf', 'image/jpeg', 'image/png'];
 
@@ -163,9 +197,12 @@ function _checkNewFilesCore() {
   pending.sort((a, b) => a.file.getName().localeCompare(b.file.getName()));
 
   if (pending.length === 0) {
+    _clearProgressCell();
     NotifyUtils.notifyComplete(0);
     return;
   }
+
+  _setProgressCell(`処理中... (残り${pending.length}件)`);
 
   // 最大10枚を処理
   const batch = pending.slice(0, BATCH_SIZE);
@@ -190,8 +227,30 @@ function _checkNewFilesCore() {
     _scheduleContinueTrigger();
   } else {
     Logger.log('全件完了 → 完了通知');
+    _clearProgressCell();
     NotifyUtils.notifyComplete(count);
   }
+}
+
+/**
+ * 開始用シートのC12セルに進捗メッセージを書き込む
+ */
+function _setProgressCell(message) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName('開始用');
+  if (!sheet) return;
+  sheet.getRange('C12').setValue(message);
+  SpreadsheetApp.flush();
+}
+
+/**
+ * 開始用シートのC12セルをクリアする
+ */
+function _clearProgressCell() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName('開始用');
+  if (!sheet) return;
+  sheet.getRange('C12').clearContent();
 }
 
 

@@ -3,3 +3,4 @@ docs/.DS_Store
 formulas_output.json
 memory/
 .claude/
+src/gas_backup*/

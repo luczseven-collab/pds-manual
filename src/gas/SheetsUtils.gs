@@ -104,16 +104,17 @@ const SheetsUtils = {
    * D: 処理日時
    * E: ファイル名
    * F: 注文コード（手動入力）
-   * G: ご利用日（数式）
-   * H: タイトル（onEdit生成）
-   * I: 【お客様の普段の洋服サイズ】（_setRowSizeHtmlで生成）
-   * J: ☆お客様がレンタルしたドレスはこちら☆（onEdit生成）
-   * K: 着用頂いた感想
-   * L: AI返信文
-   * M〜P: 商品_1（コード・リンク・単価・商品詳細）数式
-   * Q〜T: 商品_2（コード・リンク・単価・商品詳細）数式
-   * U〜X: 商品_3（コード・リンク・単価・商品詳細）数式
-   * Y: 年齢
+   * G: カテゴリ（onEdit生成: 都道府県 エリア 用途）
+   * H: ご利用日（数式）
+   * I: タイトル（onEdit生成）
+   * J: 【お客様の普段の洋服サイズ】（_setRowSizeHtmlで生成）
+   * K: ☆お客様がレンタルしたドレスはこちら☆（onEdit生成）
+   * L: 着用頂いた感想
+   * M: AI返信文
+   * N〜Q: 商品_1（コード・リンク・単価・商品詳細）数式
+   * R〜U: 商品_2（コード・リンク・単価・商品詳細）数式
+   * V〜Y: 商品_3（コード・リンク・単価・商品詳細）数式
+   * Z: 年齢
    * Z: 普段の洋服のサイズ（ブランク）
    * AA: トップスサイズ
    * AB: ボトムスサイズ
@@ -142,16 +143,17 @@ const SheetsUtils = {
       now,                        // D: 処理日時
       answers.fileName || '',     // E: ファイル名
       answers.orderCode || '',    // F: 注文コード（手動入力）
-      '',                         // G: ご利用日（数式で自動入力）
-      '',                         // H: タイトル（onEdit生成）
-      '',                         // I: 【お客様の普段の洋服サイズ】（_setRowSizeHtmlで生成）
-      '',                         // J: ☆お客様がレンタルしたドレスはこちら☆（onEdit生成）
-      answers.freeComment ? `【ご利用頂いた感想・ご意見をお願いします】\n${answers.freeComment}` : '',  // K: 着用頂いた感想
-      answers.aiReply ? `【スタッフコメント】\n${answers.aiReply}` : '',  // L: AI返信文
-      '', '', '', '',             // M〜P: 商品_1（数式で自動入力）
-      '', '', '', '',             // Q〜T: 商品_2（数式で自動入力）
-      '', '', '', '',             // U〜X: 商品_3（数式で自動入力）
-      answers.age || '',          // Y: 年齢
+      '',                         // G: カテゴリ（onEdit生成）
+      '',                         // H: ご利用日（数式で自動入力）
+      '',                         // I: タイトル（onEdit生成）
+      '',                         // J: 【お客様の普段の洋服サイズ】（_setRowSizeHtmlで生成）
+      '',                         // K: ☆お客様がレンタルしたドレスはこちら☆（onEdit生成）
+      answers.freeComment ? `【ご利用頂いた感想・ご意見をお願いします】\n${answers.freeComment}` : '',  // L: 着用頂いた感想
+      answers.aiReply ? `【スタッフコメント】\n${answers.aiReply}` : '',  // M: AI返信文
+      '', '', '', '',             // N〜Q: 商品_1（数式で自動入力）
+      '', '', '', '',             // R〜U: 商品_2（数式で自動入力）
+      '', '', '', '',             // V〜Y: 商品_3（数式で自動入力）
+      answers.age || '',          // Z: 年齢
       '',                         // Z: 普段の洋服のサイズ（ブランク）
       answers.topSize || '',      // AA: トップスサイズ
       answers.bottomSize || '',   // AB: ボトムスサイズ
@@ -336,48 +338,48 @@ const SheetsUtils = {
   },
 
   /**
-   * 指定行のG・M〜X列に数式をセットする
+   * 指定行のH・N〜Y列に数式をセットする
    * データ書き込み行にのみ適用（全行一括ではなく1行ずつ）
    *
-   * G:  ご利用日（日付型）
-   * M〜P: 商品_1（コード・リンク・単価・商品詳細）
-   * Q〜T: 商品_2
-   * U〜X: 商品_3
+   * H:  ご利用日（日付型）
+   * N〜Q: 商品_1（コード・リンク・単価・商品詳細）
+   * R〜U: 商品_2
+   * V〜Y: 商品_3
    */
   _setRowFormulas(sheet, row) {
     const i = row;
 
-    // G: ご利用日
-    const gCell = sheet.getRange(i, 7);
-    gCell.setFormula(`=IFERROR(INDEX('CSV貼付'!$E:$E,MATCH(F${i},'CSV貼付'!$A:$A,0)),"")`);
-    gCell.setNumberFormat('yyyy/MM/dd');
+    // H: ご利用日
+    const hCell = sheet.getRange(i, 8);
+    hCell.setFormula(`=IFERROR(INDEX('CSV貼付'!$E:$E,MATCH(F${i},'CSV貼付'!$A:$A,0)),"")`);
+    hCell.setNumberFormat('yyyy/MM/dd');
 
-    // M: 商品コード_1
-    sheet.getRange(i, 13).setFormula(`=IFERROR(REGEXREPLACE(INDEX('CSV貼付'!$C:$C,MATCH(F${i},'CSV貼付'!$A:$A,0)),"-[^-]+$",""),"")`);
-    // N: リンク_1
-    sheet.getRange(i, 14).setFormula(`=IFERROR(XLOOKUP(IFERROR(INDEX('CSV貼付'!$C:$C,MATCH(F${i},'CSV貼付'!$A:$A,0)),""),DB!$A:$A,DB!$C:$C),"")`);
-    // O: 単価_1
-    sheet.getRange(i, 15).setFormula(`=IFERROR(INDEX('CSV貼付'!$D:$D,MATCH(F${i},'CSV貼付'!$A:$A,0)),"")`);
-    // P: 商品詳細_1
-    sheet.getRange(i, 16).setFormula(`=IF(O${i}="","",IFERROR(XLOOKUP(O${i},'SET内容'!$A:$A,'SET内容'!$B:$B),""))`);
+    // N: 商品コード_1
+    sheet.getRange(i, 14).setFormula(`=IFERROR(REGEXREPLACE(INDEX('CSV貼付'!$C:$C,MATCH(F${i},'CSV貼付'!$A:$A,0)),"-[^-]+$",""),"")`);
+    // O: リンク_1
+    sheet.getRange(i, 15).setFormula(`=IFERROR(XLOOKUP(IFERROR(INDEX('CSV貼付'!$C:$C,MATCH(F${i},'CSV貼付'!$A:$A,0)),""),DB!$A:$A,DB!$C:$C),"")`);
+    // P: 単価_1
+    sheet.getRange(i, 16).setFormula(`=IFERROR(INDEX('CSV貼付'!$D:$D,MATCH(F${i},'CSV貼付'!$A:$A,0)),"")`);
+    // Q: 商品詳細_1
+    sheet.getRange(i, 17).setFormula(`=IF(P${i}="","",IFERROR(XLOOKUP(P${i},'SET内容'!$A:$A,'SET内容'!$B:$B),""))`);
 
-    // Q: 商品コード_2
-    sheet.getRange(i, 17).setFormula(`=IFERROR(REGEXREPLACE(INDEX(FILTER('CSV貼付'!$C:$C,'CSV貼付'!$A:$A=F${i}),2),"-[^-]+$",""),"")`);
-    // R: リンク_2
-    sheet.getRange(i, 18).setFormula(`=IFERROR(XLOOKUP(IFERROR(INDEX(FILTER('CSV貼付'!$C:$C,'CSV貼付'!$A:$A=F${i}),2),""),DB!$A:$A,DB!$C:$C),"")`);
-    // S: 単価_2
-    sheet.getRange(i, 19).setFormula(`=IFERROR(INDEX(FILTER('CSV貼付'!$D:$D,'CSV貼付'!$A:$A=F${i}),2),"")`);
-    // T: 商品詳細_2
-    sheet.getRange(i, 20).setFormula(`=IF(S${i}="","",IFERROR(XLOOKUP(S${i},'SET内容'!$A:$A,'SET内容'!$B:$B),""))`);
+    // R: 商品コード_2
+    sheet.getRange(i, 18).setFormula(`=IFERROR(REGEXREPLACE(INDEX(FILTER('CSV貼付'!$C:$C,'CSV貼付'!$A:$A=F${i}),2),"-[^-]+$",""),"")`);
+    // S: リンク_2
+    sheet.getRange(i, 19).setFormula(`=IFERROR(XLOOKUP(IFERROR(INDEX(FILTER('CSV貼付'!$C:$C,'CSV貼付'!$A:$A=F${i}),2),""),DB!$A:$A,DB!$C:$C),"")`);
+    // T: 単価_2
+    sheet.getRange(i, 20).setFormula(`=IFERROR(INDEX(FILTER('CSV貼付'!$D:$D,'CSV貼付'!$A:$A=F${i}),2),"")`);
+    // U: 商品詳細_2
+    sheet.getRange(i, 21).setFormula(`=IF(T${i}="","",IFERROR(XLOOKUP(T${i},'SET内容'!$A:$A,'SET内容'!$B:$B),""))`);
 
-    // U: 商品コード_3
-    sheet.getRange(i, 21).setFormula(`=IFERROR(REGEXREPLACE(INDEX(FILTER('CSV貼付'!$C:$C,'CSV貼付'!$A:$A=F${i}),3),"-[^-]+$",""),"")`);
-    // V: リンク_3
-    sheet.getRange(i, 22).setFormula(`=IFERROR(XLOOKUP(IFERROR(INDEX(FILTER('CSV貼付'!$C:$C,'CSV貼付'!$A:$A=F${i}),3),""),DB!$A:$A,DB!$C:$C),"")`);
-    // W: 単価_3
-    sheet.getRange(i, 23).setFormula(`=IFERROR(INDEX(FILTER('CSV貼付'!$D:$D,'CSV貼付'!$A:$A=F${i}),3),"")`);
-    // X: 商品詳細_3
-    sheet.getRange(i, 24).setFormula(`=IF(W${i}="","",IFERROR(XLOOKUP(W${i},'SET内容'!$A:$A,'SET内容'!$B:$B),""))`);
+    // V: 商品コード_3
+    sheet.getRange(i, 22).setFormula(`=IFERROR(REGEXREPLACE(INDEX(FILTER('CSV貼付'!$C:$C,'CSV貼付'!$A:$A=F${i}),3),"-[^-]+$",""),"")`);
+    // W: リンク_3
+    sheet.getRange(i, 23).setFormula(`=IFERROR(XLOOKUP(IFERROR(INDEX(FILTER('CSV貼付'!$C:$C,'CSV貼付'!$A:$A=F${i}),3),""),DB!$A:$A,DB!$C:$C),"")`);
+    // X: 単価_3
+    sheet.getRange(i, 24).setFormula(`=IFERROR(INDEX(FILTER('CSV貼付'!$D:$D,'CSV貼付'!$A:$A=F${i}),3),"")`);
+    // Y: 商品詳細_3
+    sheet.getRange(i, 25).setFormula(`=IF(X${i}="","",IFERROR(XLOOKUP(X${i},'SET内容'!$A:$A,'SET内容'!$B:$B),""))`);
   },
 
   /**
@@ -434,15 +436,15 @@ const SheetsUtils = {
     const codeStr = codes.join('・');
     const label = this._buildProductLabel(products.map(p => p.detail));
 
-    // AH・AJ列を別途取得（AG=33→AH=34, AI=35→AJ=36、1列ずれ）
-    const agAi = sheet.getRange(i, 33, 1, 4).getValues()[0];
-    const prefecture = agAi[0]; // AG列
-    const areaSub    = agAi[1]; // AH列
+    // AH・AI・AK列を別途取得（G列挿入後: AH=35, AI=36, AK=38）
+    const agAi = sheet.getRange(i, 34, 1, 4).getValues()[0];
+    const prefecture = agAi[0]; // AH列(34)
+    const areaSub    = agAi[1]; // AI列(35)
     const area  = [prefecture, areaSub].filter(v => v).join('・');
-    const usage = agAi[3]; // AJ列
+    const usage = agAi[3]; // AK列(37)
 
     const title = `${dateStr}　${usage}ご利用　${area}エリア｜${codeStr}（${label}）`;
-    sheet.getRange(i, 8).setValue(title); // H列
+    sheet.getRange(i, 9).setValue(title); // I列（G列挿入後）
   },
 
   /**
@@ -454,8 +456,8 @@ const SheetsUtils = {
     const i = row;
 
     // ドレスの商品コードを探す（P/T/X列の商品詳細で「ドレス」を含む行を優先）
-    const productVals = sheet.getRange(i, 13, 1, 12).getValues()[0];
-    // [M,N,O,P, Q,R,S,T, U,V,W,X] = [0,1,2,3, 4,5,6,7, 8,9,10,11]
+    const productVals = sheet.getRange(i, 14, 1, 12).getValues()[0];
+    // [N,O,P,Q, R,S,T,U, V,W,X,Y] = [0,1,2,3, 4,5,6,7, 8,9,10,11]（G列挿入後）
     const sets = [
       { code: productVals[0], detail: productVals[3]  }, // 商品_1
       { code: productVals[4], detail: productVals[7]  }, // 商品_2
@@ -515,7 +517,7 @@ const SheetsUtils = {
     const p2Line = p2Items ? `${p2Items}<br>` : '';
     const html = `【お客様の普段の洋服サイズ】\n<div class="size-info"><p class="ub">${ubLine}</p><p>${p2Line}品質：${q3Quality}　　　　着心地：${q3Comfort}　　　<br class="sp-only">サイズ感：${q3Size}　　ドレス丈：${q3Length}</p></div>`;
 
-    sheet.getRange(i, 9).setValue(html); // I列
+    sheet.getRange(i, 10).setValue(html); // J列（G列挿入後）
   },
 
   /**
@@ -526,8 +528,8 @@ const SheetsUtils = {
    */
   _setRowDressHtml(ss, sheet, row) {
     const i = row;
-    const vals = sheet.getRange(i, 13, 1, 12).getValues()[0];
-    // M=0, N=1, O=2, P=3, Q=4, R=5, S=6, T=7, U=8, V=9, W=10, X=11
+    const vals = sheet.getRange(i, 14, 1, 12).getValues()[0];
+    // N=0, O=1, P=2, Q=3, R=4, S=5, T=6, U=7, V=8, W=9, X=10, Y=11（G列挿入後）
     const products = [
       { code: vals[0], link: vals[1], price: vals[2],  detail: vals[3]  }, // 商品_1
       { code: vals[4], link: vals[5], price: vals[6],  detail: vals[7]  }, // 商品_2
@@ -576,7 +578,7 @@ const SheetsUtils = {
       return `${title}\n\n【商品品番】\n${p.code}\n<a href="${p.link}"><span style="color:${linkColor}; font-weight:bold; font-size: 14px; text-decoration: underline;">${name}</span></a>\n\n【レンタル内容】\n${p.detail}\n3泊4日レンタル価格${priceStr}円（税込）`;
     });
 
-    sheet.getRange(i, 10).setValue(blocks.join('\n\n')); // J列
+    sheet.getRange(i, 11).setValue(blocks.join('\n\n')); // K列（G列挿入後）✓
   },
 
   /**
@@ -638,7 +640,7 @@ const SheetsUtils = {
       '備考', '担当者', '進捗',
       // D〜L: 基本情報・表示用
       '処理日時', 'ファイル名', '注文コード',
-      'ご利用日', 'タイトル', '【お客様の普段の洋服サイズ】',
+      'カテゴリ', 'ご利用日', 'タイトル', '【お客様の普段の洋服サイズ】',
       '☆お客様がレンタルしたドレスはこちら☆', '着用頂いた感想・サイズ感・レンタルの流れについてのご意見', 'AI返信文',
       // M〜P: 商品_1（数式）
       '商品コード_1', 'リンク_1', '単価_1', '商品詳細_1',

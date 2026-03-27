@@ -14,5 +14,6 @@ const Config = {
   get CHATWORK_API_TOKEN() { return PropertiesService.getScriptProperties().getProperty('CHATWORK_API_TOKEN'); },
   get CHATWORK_ROOM_ID()   { return PropertiesService.getScriptProperties().getProperty('CHATWORK_ROOM_ID'); },
   get NOTIFY_EMAIL()       { return PropertiesService.getScriptProperties().getProperty('NOTIFY_EMAIL'); },
-
+  get DRIVE_FOLDER_IMAGE_DB_ID()       { return PropertiesService.getScriptProperties().getProperty('DRIVE_FOLDER_IMAGE_DB_ID'); },
+  get DRIVE_FOLDER_CUSTOMER_IMAGE_ID() { return PropertiesService.getScriptProperties().getProperty('DRIVE_FOLDER_CUSTOMER_IMAGE_ID'); },
 };
