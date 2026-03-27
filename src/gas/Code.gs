@@ -185,7 +185,13 @@ function _checkNewFilesCore() {
   const pending = [];
   targets.forEach(({ folderId, isPublishOk }) => {
     if (!folderId) return;
-    const folder = DriveApp.getFolderById(folderId);
+    let folder;
+    try {
+      folder = DriveApp.getFolderById(folderId);
+    } catch (e) {
+      Logger.log('フォルダ取得エラー (folderId=' + folderId + '): ' + e.message);
+      return;
+    }
     const files = folder.getFiles();
     while (files.hasNext()) {
       const file = files.next();
