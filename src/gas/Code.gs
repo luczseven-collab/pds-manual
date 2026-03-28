@@ -14,8 +14,8 @@ function onEditTrigger(e) {
   const col = e.range.getColumn();
   const row = e.range.getRow();
 
-  // 2行目以降のみ対象
-  if (row < 2) return;
+  // 3行目以降のみ対象（1行目=警告行、2行目=ヘッダー）
+  if (row < 3) return;
 
   // 集計シート名パターン（例：【PDS_2026-03-17】集計）のみ対象
   if (!sheet.getName().match(/【.+_\d{4}-\d{2}-\d{2}】集計/)) return;
@@ -78,9 +78,12 @@ function onEditTrigger(e) {
  * 月スプシをコピーした初回オープン時に自動でトリガーが設定される
  */
 function onOpen() {
-  SpreadsheetApp.getUi()
-    .createMenu('PDS管理')
+  const ui = SpreadsheetApp.getUi();
+  ui.createMenu('PDS管理')
     .addItem('月初セットアップ（初回のみ）', 'setupOnEditTrigger')
+    .addToUi();
+  ui.createMenu('⚠️ 必須処理')
+    .addItem('値で確定（注文コード入力完了後に実行）', 'confirmValues')
     .addToUi();
 
   // セットアップ済みフラグを確認（承認不要）
@@ -133,6 +136,35 @@ function _copyPropertiesFromMaster() {
     if (key && value) localProps.setProperty(String(key), String(value));
   });
   Logger.log('_copyPropertiesFromMaster: プロパティコピー完了（' + data.length + '件）');
+}
+
+/**
+ * アクティブな日付シートの全データ行（3行目以降）の数式を値に変換する。
+ * CSV貼付の内容が変わっても参照先が消えないようにするための確定処理。
+ */
+function confirmValues() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getActiveSheet();
+
+  // 日付シート（【brand_yyyy-MM-dd】集計）のみ対象
+  if (!sheet.getName().match(/【.+_\d{4}-\d{2}-\d{2}】集計/)) {
+    SpreadsheetApp.getUi().alert('このシートは対象外です。\n【ブランド_yyyy-MM-dd】集計シートで実行してください。');
+    return;
+  }
+
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 3) {
+    SpreadsheetApp.getUi().alert('データがありません。');
+    return;
+  }
+
+  // 3行目以降の全データを値に変換
+  const lastCol = sheet.getLastColumn();
+  const dataRange = sheet.getRange(3, 1, lastRow - 2, lastCol);
+  const values = dataRange.getValues();
+  dataRange.setValues(values);
+
+  SpreadsheetApp.getUi().alert('値で確定しました（' + (lastRow - 2) + '行）。');
 }
 
 /**
@@ -200,7 +232,11 @@ function _checkNewFilesCore() {
       pending.push({ file, isPublishOk });
     }
   });
-  pending.sort((a, b) => a.file.getName().localeCompare(b.file.getName()));
+  // OK優先（isPublishOk=true を先に）、同じフォルダ内はファイル名昇順
+  pending.sort((a, b) => {
+    if (a.isPublishOk !== b.isPublishOk) return a.isPublishOk ? -1 : 1;
+    return a.file.getName().localeCompare(b.file.getName());
+  });
 
   if (pending.length === 0) {
     _clearProgressCell();
@@ -208,7 +244,9 @@ function _checkNewFilesCore() {
     return;
   }
 
-  _setProgressCell(`処理中... (残り${pending.length}件)`);
+  const okCount = pending.filter(p => p.isPublishOk).length;
+  const ngCount = pending.filter(p => !p.isPublishOk).length;
+  _setProgressCell(okCount, ngCount);
 
   // 最大10枚を処理
   const batch = pending.slice(0, BATCH_SIZE);
@@ -225,9 +263,13 @@ function _checkNewFilesCore() {
   });
 
   // 未処理が残っていれば即トリガーを登録して続きを処理
-  const remaining = pending.length - batch.length;
+  const afterBatch = pending.slice(batch.length);
+  const remaining = afterBatch.length;
+  const remainingOk = afterBatch.filter(p => p.isPublishOk).length;
+  const remainingNg = afterBatch.filter(p => !p.isPublishOk).length;
   Logger.log('処理枚数: ' + batch.length + ' / 残り: ' + remaining + ' / pending合計: ' + pending.length);
   if (remaining > 0) {
+    _setProgressCell(remainingOk, remainingNg);
     Logger.log('続きのトリガーを登録します');
     _deleteContinueTriggers();
     _scheduleContinueTrigger();
@@ -239,23 +281,27 @@ function _checkNewFilesCore() {
 }
 
 /**
- * 開始用シートのC12セルに進捗メッセージを書き込む
+ * 開始用シートのC13（掲載OK）・C14（掲載NG）セルに残件数を表示する
+ * @param {number} okCount
+ * @param {number} ngCount
  */
-function _setProgressCell(message) {
+function _setProgressCell(okCount, ngCount) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName('開始用');
   if (!sheet) return;
-  sheet.getRange('C12').setValue(message);
+  sheet.getRange('C11').setValue(`処理中... (残り${okCount}件)`);
+  sheet.getRange('C12').setValue(`処理中... (残り${ngCount}件)`);
   SpreadsheetApp.flush();
 }
 
 /**
- * 開始用シートのC12セルをクリアする
+ * 開始用シートのC13・C14セルをクリアする
  */
 function _clearProgressCell() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName('開始用');
   if (!sheet) return;
+  sheet.getRange('C11').clearContent();
   sheet.getRange('C12').clearContent();
 }
 
@@ -306,6 +352,12 @@ function processAnketFile(file, isPublishOk) {
   SheetsUtils.writeToOpinionSheet(analyzed);
 
   SheetsUtils.writeLog(file.getName(), 'DONE', '');
+
+  // 処理済みファイルの先頭に「済_」を付けてリネーム（二重付与を防止）
+  const currentName = file.getName();
+  if (!currentName.startsWith('済_')) {
+    file.setName('済_' + currentName);
+  }
 }
 
 /**
